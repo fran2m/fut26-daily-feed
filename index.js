@@ -1,3 +1,7 @@
+// 👇 Parche temporal para Node 18 (evita el error "File is not defined")
+const { Blob, File } = require('node:buffer');
+global.File = File;
+global.Blob = Blob;
 const fetch = require('node-fetch');
 const cheerio = require('cheerio');
 const fs = require('fs');
