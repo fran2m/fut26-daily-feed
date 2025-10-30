@@ -1,149 +1,135 @@
-// 👇 Parche temporal para Node 18 (evita el error "File is not defined")
-const { Blob, File } = require('node:buffer');
-global.File = File;
-global.Blob = Blob;
-const fetch = require('node-fetch');
-const cheerio = require('cheerio');
 const fs = require('fs');
+const axios = require('axios');
+const { execSync } = require('child_process');
 
-const WEBHOOK = process.env.DISCORD_WEBHOOK_URL;
-if (!WEBHOOK) {
-  console.error('Falta DISCORD_WEBHOOK_URL en los secrets.');
+const WEBHOOK_URL = process.env.WEBHOOK_URL;
+if (!WEBHOOK_URL) {
+  console.error("ERROR: Pon tu WEBHOOK_URL en Secrets de GitHub Actions (WEBHOOK_URL).");
   process.exit(1);
 }
 
-const POSTED_FILE = 'posted.json';
+const LAST_FILE = 'last.json';
 
-const PAGES = [
-  { name: 'SBC', url: 'https://www.futbin.com/squad-building-challenges' },
-  { name: 'Objectives', url: 'https://www.futbin.com/objectives' },
-  { name: 'News', url: 'https://www.futbin.com/news' },
-];
+// ---------- Helper: lee last.json ----------
+function readLast() {
+  if (!fs.existsSync(LAST_FILE)) {
+    return { sbcs: [], objetivos: [], jugadores: [] };
+  }
+  return JSON.parse(fs.readFileSync(LAST_FILE, 'utf8'));
+}
 
-function loadPosted() {
+// ---------- Helper: guarda last.json ----------
+function saveLast(data) {
+  fs.writeFileSync(LAST_FILE, JSON.stringify(data, null, 2), 'utf8');
+}
+
+// ---------- COMPARADOR: devuelve elementos nuevos ----------
+function diffArrays(oldArr, newArr) {
+  const setOld = new Set(oldArr);
+  return newArr.filter(x => !setOld.has(x));
+}
+
+// ---------- Construye mensaje para Discord ----------
+function buildMessage(newSbcs, newObj, newJugs) {
+  const hoy = new Date().toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  let mensaje = `🆕 *NUEVO CONTENIDO ${hoy}*\n\n`;
+
+  mensaje += `*SBC nuevos:*\n`;
+  mensaje += newSbcs.length ? newSbcs.map(s => `- ${s}`).join('\n') : '- Ninguno';
+  mensaje += '\n\n';
+
+  mensaje += `*Objetivos nuevos:*\n`;
+  mensaje += newObj.length ? newObj.map(o => `- ${o}`).join('\n') : '- Ninguno';
+  mensaje += '\n\n';
+
+  mensaje += `*Jugadores nuevos:*\n`;
+  mensaje += newJugs.length ? newJugs.map(j => `- ${j}`).join('\n') : '- Ninguno';
+  mensaje += '\n\n';
+
+  return mensaje;
+}
+
+// ---------- ENVÍO al webhook ----------
+async function sendToDiscord(message) {
   try {
-    return JSON.parse(fs.readFileSync(POSTED_FILE, 'utf8'));
-  } catch (e) {
-    return { posted: [] };
+    await axios.post(WEBHOOK_URL, { content: message });
+    console.log("Mensaje enviado a Discord.");
+  } catch (err) {
+    console.error("Error enviando a Discord:", err.response ? err.response.data : err.message);
+    throw err;
   }
 }
 
-function savePosted(obj) {
-  fs.writeFileSync(POSTED_FILE, JSON.stringify(obj, null, 2));
-}
-
-async function fetchPage(url) {
-  const res = await fetch(url, {
-    headers: {
-      'User-Agent': 'Mozilla/5.0 (compatible; DiscordBot/1.0; +https://github.com)',
-    },
-  });
-  if (!res.ok) throw new Error(`Error ${res.status} al obtener ${url}`);
-  return await res.text();
-}
-
-function extractItemsFromHtml(html, baseUrl) {
-  const $ = cheerio.load(html);
-  let items = [];
-  const containers = ['#content', '.news-list', '.list-group', '.sbcList', '.items'];
-  let found = false;
-
-  for (const sel of containers) {
-    const el = $(sel);
-    if (el.length) {
-      el.find('a').each((_, a) => {
-        const $a = $(a);
-        const text = $a.text().trim();
-        const href = $a.attr('href');
-        if (text && href) {
-          const link = href.startsWith('http') ? href : new URL(href, baseUrl).toString();
-          items.push({ title: text.replace(/\s+/g, ' ').trim(), link });
-        }
-      });
-      if (items.length) { found = true; break; }
-    }
+/*
+  ---- AQUÍ está la parte que debes adaptar ----
+  fetchCurrentData() debe devolver un objeto:
+  {
+    sbcs: [ "titulo sbc 1", "titulo sbc 2", ... ],
+    objetivos: [ "titulo objetivo 1", ... ],
+    jugadores: [ "Nombre Jugador 1", ... ]
   }
-
-  if (!found) {
-    $('article a, .news a, a').each((_, a) => {
-      const $a = $(a);
-      const text = $a.text().trim();
-      const href = $a.attr('href');
-      if (text && href) {
-        const link = href.startsWith('http') ? href : new URL(href, baseUrl).toString();
-        items.push({ title: text.replace(/\s+/g, ' ').trim(), link });
-      }
-    });
-  }
-
-  const seen = new Set();
-  items = items.filter(it => {
-    if (!it.link) return false;
-    if (seen.has(it.link)) return false;
-    seen.add(it.link);
-    return true;
-  });
-
-  return items;
+  Puedes hacer scraping o llamar a una API. Ejemplo de estructura abajo (simulada).
+*/
+async function fetchCurrentData() {
+  // --- EJEMPLO SIMULADO: sustitúyelo por tu fetch real ---
+  // Por ejemplo: fetch a fut.gg / futbin / tu API y parsear los títulos/links.
+  return {
+    sbcs: [
+      "Icono max 87",       // ejemplo
+      "Mejora x10 84+"
+    ],
+    objetivos: [
+      "Puntos de Rush"
+    ],
+    jugadores: [
+      "Vidic (Icono Metamorfo 95)"
+    ]
+  };
 }
 
-async function gatherNewItems() {
-  const allNew = [];
-  for (const p of PAGES) {
-    try {
-      const html = await fetchPage(p.url);
-      const items = extractItemsFromHtml(html, p.url);
-      const top = items.slice(0, 15).map(it => ({ ...it, source: p.name }));
-      allNew.push(...top);
-    } catch (err) {
-      console.error('Error al procesar', p.url, err.message);
-    }
-  }
-  return allNew;
-}
-
-async function sendWebhook(content) {
-  const res = await fetch(WEBHOOK, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ content }),
-  });
-  return res;
-}
-
+// ---------- MAIN ----------
 (async () => {
-  const store = loadPosted();
-  const posted = new Set(store.posted || []);
+  try {
+    const last = readLast();
+    console.log("Último guardado:", last);
 
-  const items = await gatherNewItems();
-  const newItems = items.filter(it => !posted.has(it.link));
+    const current = await fetchCurrentData();
+    console.log("Datos actuales:", current);
 
-  if (newItems.length === 0) {
-    console.log('No hay items nuevos hoy.');
-    return;
+    // Comparar
+    const newSbcs = diffArrays(last.sbcs || [], current.sbcs || []);
+    const newObj = diffArrays(last.objetivos || [], current.objetivos || []);
+    const newJugs = diffArrays(last.jugadores || [], current.jugadores || []);
+
+    console.log("Novedades detectadas:", { newSbcs, newObj, newJugs });
+
+    // Si no hay novedades -> NO enviar nada
+    if (newSbcs.length === 0 && newObj.length === 0 && newJugs.length === 0) {
+      console.log("No hay nuevas entradas. No se enviará mensaje.");
+      process.exit(0);
+    }
+
+    // Construir y enviar mensaje
+    const message = buildMessage(newSbcs, newObj, newJugs);
+    await sendToDiscord(message);
+
+    // Actualizar last.json con los datos actuales (no sólo añadir nuevos)
+    saveLast(current);
+
+    // Commit y push del last.json actualizado
+    try {
+      execSync('git config user.name "github-actions[bot]"');
+      execSync('git config user.email "41898282+github-actions[bot]@users.noreply.github.com"');
+      execSync('git add ' + LAST_FILE);
+      execSync('git commit -m "Actualiza last.json con novedades" || true'); // evita fallo si no hay cambios
+      execSync('git push');
+      console.log("last.json actualizado y enviado al repo.");
+    } catch (gitErr) {
+      console.error("Error al commitear/pushear last.json:", gitErr.message);
+    }
+
+  } catch (err) {
+    console.error("Error general:", err);
+    process.exit(1);
   }
-
-  let content = `🎮 *Contenido nuevo de FC26 Ultimate Team (${new Date().toLocaleDateString()})*\n\n`;
-  const bySource = {};
-  newItems.forEach(it => {
-    if (!bySource[it.source]) bySource[it.source] = [];
-    bySource[it.source].push(it);
-  });
-
-  for (const key of Object.keys(bySource)) {
-    content += `*${key}*\n`;
-    bySource[key].slice(0, 10).forEach(it => {
-     content += `• ${it.title}\n  ${it.link}\n`;
-    });
-    content += `\n`;
-  }
-
-  if (content.length > 1900) content = content.slice(0, 1900) + '\n\n(Mensaje recortado)';
-
-  const resp = await sendWebhook(content);
-  console.log('Webhook enviado, status:', resp.status);
-
-  for (const it of newItems) posted.add(it.link);
-  store.posted = Array.from(posted);
-  savePosted(store);
 })();
