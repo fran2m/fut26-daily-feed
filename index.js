@@ -34,7 +34,7 @@ async function fetchPage(url) {
       'User-Agent': 'Mozilla/5.0 (compatible; DiscordBot/1.0; +https://github.com)',
     },
   });
-  if (!res.ok) throw new Error(Error ${res.status} al obtener ${url});
+  if (!res.ok) throw new Error(`Error ${res.status} al obtener ${url}`);
   return await res.text();
 }
 
