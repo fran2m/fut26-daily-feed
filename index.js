@@ -4,7 +4,7 @@ import fs from "fs";
 const webhookUrl = process.env.WEBHOOK_URL;
 
 // 🔹 Fuente de datos actualizada para FC26
-const API_URL = "https://api.fut.gg/api/fc26/content";
+const API_URL = "https://www.fut.gg/api/fc26/";
 // 🔹 Archivo donde se guarda el último contenido conocido
 const CACHE_FILE = "./lastContent.json";
 
