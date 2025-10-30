@@ -119,7 +119,7 @@ async function sendWebhook(content) {
     return;
   }
 
-  let content = 🎮 **Contenido nuevo de FC26 Ultimate Team (${new Date().toLocaleDateString()})**\n\n;
+  let content = `🎮 *Contenido nuevo de FC26 Ultimate Team (${new Date().toLocaleDateString()})*\n\n`;
   const bySource = {};
   newItems.forEach(it => {
     if (!bySource[it.source]) bySource[it.source] = [];
