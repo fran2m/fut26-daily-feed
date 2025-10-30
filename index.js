@@ -2,33 +2,44 @@ import axios from "axios";
 
 const webhookUrl = process.env.WEBHOOK_URL;
 
+// 🔹 Fuente de datos Paletools
 const BASE_URL = "https://fc26.paletools.io/database";
 
 async function getDailyContent() {
   try {
     const [sbcRes, objRes, playerRes] = await Promise.all([
-      axios.get(`${BASE_URL}/sbc`),
-      axios.get(`${BASE_URL}/objectives`),
-      axios.get(`${BASE_URL}/player`),
+      axios.get(`${BASE_URL}/sbc?_limit=5`),
+      axios.get(`${BASE_URL}/objective?_limit=5`),
+      axios.get(`${BASE_URL}/player?_limit=5`),
     ]);
 
     return {
-      sbcs: sbcRes.data.slice(0, 5),
-      objectives: objRes.data.slice(0, 5),
-      players: playerRes.data.slice(0, 5),
+      sbcs: sbcRes.data || [],
+      objectives: objRes.data || [],
+      players: playerRes.data || [],
     };
   } catch (error) {
-    console.error("❌ Error al obtener contenido:", error.message);
+    console.error("❌ Error al obtener contenido:", error.response?.status, error.message);
     return null;
   }
 }
 
 function formatContent(data) {
-  if (!data) return "⚠️ No se encontró contenido nuevo hoy.";
+  if (!data || (!data.sbcs.length && !data.objectives.length && !data.players.length)) {
+    return "⚠️ No se encontró contenido nuevo hoy.";
+  }
 
-  const sbcs = data.sbcs?.map(s => `• ${s.name || s.title || "Sin nombre"}`).join("\n") || "— Ninguno —";
-  const objectives = data.objectives?.map(o => `• ${o.name || o.title || "Sin nombre"}`).join("\n") || "— Ninguno —";
-  const players = data.players?.map(p => `• ${p.name || "Jugador desconocido"} (${p.rating || "?"})`).join("\n") || "— Ninguno —";
+  const sbcs = data.sbcs.length
+    ? data.sbcs.map(s => `• ${s.name || s.title || s.id}`).join("\n")
+    : "— Ninguno —";
+
+  const objectives = data.objectives.length
+    ? data.objectives.map(o => `• ${o.name || o.title || o.id}`).join("\n")
+    : "— Ninguno —";
+
+  const players = data.players.length
+    ? data.players.map(p => `• ${p.name || "Jugador desconocido"} (${p.rating || "?"})`).join("\n")
+    : "— Ninguno —";
 
   return `**📢 NUEVO CONTENIDO FC26 ULTIMATE TEAM**
 📅 ${new Date().toLocaleDateString("es-ES")}
