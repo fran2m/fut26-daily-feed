@@ -3,7 +3,7 @@ import axios from "axios";
 const webhookUrl = process.env.WEBHOOK_URL;
 
 // 🔹 Fuente de datos — Fut.gg (actualizada para FC26)
-const API_URL = "https://api.fut.gg/api/fc25/content";
+const API_URL = "https://api.fut.gg/api/fc26/content";
 
 async function getDailyContent() {
   try {
