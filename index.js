@@ -1,57 +1,42 @@
 import axios from "axios";
+import * as cheerio from "cheerio";
 
 const webhookUrl = process.env.WEBHOOK_URL;
-
-// 🔹 Fuente de datos Paletools
-const BASE_URL = "https://fc26.paletools.io/database";
+const PALETOOLS_URL = "https://fc26.paletools.io/daily-content";
 
 async function getDailyContent() {
   try {
-    const [sbcRes, objRes, playerRes] = await Promise.all([
-      axios.get(`${BASE_URL}/sbc?_limit=5`),
-      axios.get(`${BASE_URL}/objective?_limit=5`),
-      axios.get(`${BASE_URL}/player?_limit=5`),
-    ]);
+    const { data: html } = await axios.get(PALETOOLS_URL);
+    const $ = cheerio.load(html);
 
-    return {
-      sbcs: sbcRes.data || [],
-      objectives: objRes.data || [],
-      players: playerRes.data || [],
-    };
+    const sbcs = [];
+    const objectives = [];
+    const players = [];
+
+    // Buscar secciones por texto
+    $("h2").each((_, el) => {
+      const title = $(el).text().toLowerCase();
+
+      if (title.includes("sbc")) {
+        $(el).next("ul").find("li").each((_, li) => {
+          sbcs.push($(li).text().trim());
+        });
+      } else if (title.includes("objective")) {
+        $(el).next("ul").find("li").each((_, li) => {
+          objectives.push($(li).text().trim());
+        });
+      } else if (title.includes("player")) {
+        $(el).next("ul").find("li").each((_, li) => {
+          players.push($(li).text().trim());
+        });
+      }
+    });
+
+    return { sbcs, objectives, players };
   } catch (error) {
-    console.error("❌ Error al obtener contenido:", error.response?.status, error.message);
+    console.error("❌ Error al obtener contenido de Paletools:", error.message);
     return null;
   }
-}
-
-function formatContent(data) {
-  if (!data || (!data.sbcs.length && !data.objectives.length && !data.players.length)) {
-    return "⚠️ No se encontró contenido nuevo hoy.";
-  }
-
-  const sbcs = data.sbcs.length
-    ? data.sbcs.map(s => `• ${s.name || s.title || s.id}`).join("\n")
-    : "— Ninguno —";
-
-  const objectives = data.objectives.length
-    ? data.objectives.map(o => `• ${o.name || o.title || o.id}`).join("\n")
-    : "— Ninguno —";
-
-  const players = data.players.length
-    ? data.players.map(p => `• ${p.name || "Jugador desconocido"} (${p.rating || "?"})`).join("\n")
-    : "— Ninguno —";
-
-  return `**📢 NUEVO CONTENIDO FC26 ULTIMATE TEAM**
-📅 ${new Date().toLocaleDateString("es-ES")}
-
-**🧩 SBC NUEVOS:**
-${sbcs}
-
-**🎯 OBJETIVOS NUEVOS:**
-${objectives}
-
-**👟 JUGADORES NUEVOS:**
-${players}`;
 }
 
 async function sendToDiscord(content) {
@@ -61,6 +46,26 @@ async function sendToDiscord(content) {
   } catch (error) {
     console.error("❌ Error al enviar a Discord:", error.message);
   }
+}
+
+function formatContent(data) {
+  if (!data) return "⚠️ No se pudo obtener contenido nuevo hoy.";
+
+  const sbcs = data.sbcs.length ? data.sbcs.map(s => `• ${s}`).join("\n") : "— Ninguno —";
+  const objectives = data.objectives.length ? data.objectives.map(o => `• ${o}`).join("\n") : "— Ninguno —";
+  const players = data.players.length ? data.players.map(p => `• ${p}`).join("\n") : "— Ninguno —";
+
+  return `**NUEVO CONTENIDO FC26 ULTIMATE TEAM**
+📅 ${new Date().toLocaleDateString("es-ES")}
+
+**SBC NUEVOS:**
+${sbcs}
+
+**OBJETIVOS NUEVOS:**
+${objectives}
+
+**JUGADORES NUEVOS:**
+${players}`;
 }
 
 (async () => {
