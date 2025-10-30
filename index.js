@@ -1,9 +1,12 @@
 import axios from "axios";
+import fs from "fs";
 
 const webhookUrl = process.env.WEBHOOK_URL;
 
 // 🔹 Fuente de datos actualizada para FC26
 const API_URL = "https://api.fut.gg/api/fc26/content";
+// 🔹 Archivo donde se guarda el último contenido conocido
+const CACHE_FILE = "./lastContent.json";
 
 async function getDailyContent() {
   try {
@@ -75,8 +78,34 @@ async function sendToDiscord(content) {
   }
 }
 
+// 🔹 Compara con el contenido anterior para evitar duplicados
+function hasNewContent(currentData) {
+  if (!fs.existsSync(CACHE_FILE)) return true;
+
+  const lastData = JSON.parse(fs.readFileSync(CACHE_FILE, "utf8"));
+  return JSON.stringify(currentData) !== JSON.stringify(lastData);
+}
+
+// 🔹 Guarda el contenido actual como referencia
+function saveCurrentContent(data) {
+  fs.writeFileSync(CACHE_FILE, JSON.stringify(data, null, 2));
+}
+
 (async () => {
   const data = await getDailyContent();
+
+  if (!data) {
+    console.log("⚠️ No se encontró contenido nuevo hoy (sin datos de la API).");
+    await sendToDiscord("⚠️ No se encontró contenido nuevo hoy.");
+    return;
+  }
+
+  if (!hasNewContent(data)) {
+    console.log("ℹ️ El contenido es igual al del día anterior, no se enviará mensaje.");
+    return;
+  }
+
   const message = formatContent(data);
   await sendToDiscord(message);
+  saveCurrentContent(data);
 })();
