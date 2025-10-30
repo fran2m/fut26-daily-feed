@@ -2,18 +2,45 @@ import axios from "axios";
 
 const webhookUrl = process.env.WEBHOOK_URL;
 
-// ✅ Fuente alternativa: EAFC Tracker (sin bloqueo)
-const API_URL = "https://www.eafc24tracker.com/api/fc26/content";
+const BASE_URL = "https://fc26.paletools.io/database";
 
 async function getDailyContent() {
   try {
-    const response = await axios.get(API_URL);
-    console.log("🔍 Datos recibidos:", response.data);
-    return response.data;
+    const [sbcRes, objRes, playerRes] = await Promise.all([
+      axios.get(`${BASE_URL}/sbc`),
+      axios.get(`${BASE_URL}/objectives`),
+      axios.get(`${BASE_URL}/player`),
+    ]);
+
+    return {
+      sbcs: sbcRes.data.slice(0, 5),
+      objectives: objRes.data.slice(0, 5),
+      players: playerRes.data.slice(0, 5),
+    };
   } catch (error) {
     console.error("❌ Error al obtener contenido:", error.message);
     return null;
   }
+}
+
+function formatContent(data) {
+  if (!data) return "⚠️ No se encontró contenido nuevo hoy.";
+
+  const sbcs = data.sbcs?.map(s => `• ${s.name || s.title || "Sin nombre"}`).join("\n") || "— Ninguno —";
+  const objectives = data.objectives?.map(o => `• ${o.name || o.title || "Sin nombre"}`).join("\n") || "— Ninguno —";
+  const players = data.players?.map(p => `• ${p.name || "Jugador desconocido"} (${p.rating || "?"})`).join("\n") || "— Ninguno —";
+
+  return `**📢 NUEVO CONTENIDO FC26 ULTIMATE TEAM**
+📅 ${new Date().toLocaleDateString("es-ES")}
+
+**🧩 SBC NUEVOS:**
+${sbcs}
+
+**🎯 OBJETIVOS NUEVOS:**
+${objectives}
+
+**👟 JUGADORES NUEVOS:**
+${players}`;
 }
 
 async function sendToDiscord(content) {
@@ -23,27 +50,6 @@ async function sendToDiscord(content) {
   } catch (error) {
     console.error("❌ Error al enviar a Discord:", error.message);
   }
-}
-
-function formatContent(data) {
-  if (!data || Object.keys(data).length === 0)
-    return "⚠️ No se encontró contenido nuevo hoy (sin datos de la API).";
-
-  const sbcs = data.sbc?.map(s => `• ${s.name}`).join("\n") || "— Ninguno —";
-  const objectives = data.objectives?.map(o => `• ${o.name}`).join("\n") || "— Ninguno —";
-  const players = data.players?.map(p => `• ${p.name} (${p.rating})`).join("\n") || "— Ninguno —";
-
-  return `**🟢 NUEVO CONTENIDO FC26 ULTIMATE TEAM**
-📅 ${new Date().toLocaleDateString("es-ES", { day: "2-digit", month: "long" })}
-
-**SBC NUEVOS:**
-${sbcs}
-
-**OBJETIVOS NUEVOS:**
-${objectives}
-
-**JUGADORES NUEVOS:**
-${players}`;
 }
 
 (async () => {
