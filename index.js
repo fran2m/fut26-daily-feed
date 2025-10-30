@@ -127,7 +127,7 @@ async function sendWebhook(content) {
   });
 
   for (const key of Object.keys(bySource)) {
-    content += **${key}**\n;
+    content += `*${key}*\n`;
     bySource[key].slice(0, 10).forEach(it => {
       content += • ${it.title}\n  ${it.link}\n;
     });
