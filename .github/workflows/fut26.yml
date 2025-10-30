@@ -1,34 +1,30 @@
-name: Fut26 Daily Feed
+name: Fut26 - Feed Diario
 
 on:
   schedule:
-    # 19:00 hora España (invierno UTC+1)
-    - cron: '0 18 * * *'
-  workflow_dispatch: {}
+    # OJO: GitHub Actions usa UTC. Ajusta si 19:00 es hora local distinta.
+    - cron: '0 19 * * *' # se ejecuta cada día a 19:00 UTC
+  workflow_dispatch: # permite ejecutarlo manualmente
 
 jobs:
   run:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout repo
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: true
 
-      - name: Setup Node
+      - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '18'
+          node-version: '20'
 
-      - name: Install dependencies
-        run: npm install
+      - name: Install deps
+        run: npm ci
 
-      - name: Run script
+      - name: Ejecutar script de comprobación y envío
         env:
-          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          WEBHOOK_URL: ${{ secrets.WEBHOOK_URL }}    # añade la webhook como secret
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}  # este token lo proporciona Actions
         run: node index.js
-
-      - name: Commit posted.json if changed
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add posted.json || true
-          git commit -m "Update posted.json" || echo "No changes to commit"
-          git push origin HEAD:main || echo "Push failed (no permission)"
