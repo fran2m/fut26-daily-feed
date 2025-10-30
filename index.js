@@ -8,6 +8,7 @@ const API_URL = "https://api.fut.gg/api/fc26/content";
 async function getDailyContent() {
   try {
     const response = await axios.get(API_URL);
+    console.log("🔍 Respuesta de la API:", JSON.stringify(response.data, null, 2));
     return response.data;
   } catch (error) {
     console.error("❌ Error al obtener contenido:", error.message);
