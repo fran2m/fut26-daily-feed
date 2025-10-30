@@ -131,7 +131,7 @@ async function sendWebhook(content) {
     bySource[key].slice(0, 10).forEach(it => {
      content += `• ${it.title}\n  ${it.link}\n`;
     });
-    content += \n;
+    content += `\n`;
   }
 
   if (content.length > 1900) content = content.slice(0, 1900) + '\n\n(Mensaje recortado)';
